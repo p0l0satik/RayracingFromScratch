@@ -5,12 +5,13 @@
 #include <vector>
 
 #include "geometry.h"
-
+#define EPS  0.001
 struct Sphere {
     Vec3f center;
     float radius;
     Vec3f color;
     float blink_density;
+    float mirror = 0.15;
     Sphere(const Vec3f &c, const float &r, const Vec3f &col, float bd) : center(c), radius(r), color(col), blink_density(bd) {}
 
     bool ray_intersect(const Vec3f &orig, Vec3f &dir, Vec3f &cross_point, Vec3f& N) const {
@@ -56,22 +57,40 @@ struct Light {
     float intensity;
 };
 
-Vec3f cast_ray(const Vec3f &orig,  Vec3f &dir, std::vector<Sphere>& spheres, std::vector<Light>& lights) {
+Vec3f cast_ray(const Vec3f &orig,  Vec3f &dir, std::vector<Sphere>& spheres, std::vector<Light>& lights, int req = 3) {
     // float sphere_dist = std::numeric_limits<float>::max();
+    if (!req) return Vec3f(0, 0, 0);
     for (auto sphere : spheres){
         Vec3f point, N;
+        Vec3f mirror_color = Vec3f(0, 0, 0);
         if (sphere.ray_intersect(orig, dir, point, N)){
             float diff_light_intens = 0;
             float blinks = 0;
             for(auto light : lights){
                 Vec3f light_dir = (light.position - point).normalize();
+                bool use_light = true;
+                for (auto cross_sp : spheres) {
+                    Vec3f rev_point, n;
+                    Vec3f moved_point = point * (1 + EPS ) ;
+                    Vec3f rev_light_dir = light_dir ;
+                    if (cross_sp.ray_intersect(moved_point, rev_light_dir, rev_point, n)) {
+                        // if ((rev_point - point).norm() > (orig - point).norm()){
+                            
+                        // }
+                        // std::cout << sphere.radius << std::endl;
+                        use_light = false;
+                        break;
+                    }
+                }
+                if (!use_light) continue;
                 diff_light_intens += light.intensity * std::max(0.f, light_dir * N);
                 Vec3f reflect_dir = N * 2.0 + light_dir * (-1) ;
                 blinks += light.intensity * std::max(0.0, pow((reflect_dir).normalize() * (dir * (-1)),
-                 sphere.blink_density));
-
+                                                     sphere.blink_density));
+                mirror_color = mirror_color + cast_ray(point, reflect_dir, spheres, lights, req - 1);
             }
-            return sphere.color * (diff_light_intens + blinks);
+
+            return sphere.color * (diff_light_intens + blinks) + mirror_color * sphere.mirror;
         } 
     }
     
@@ -87,10 +106,11 @@ void render() {
     
     float fov = M_PI / 2;
 
-    std::vector<Sphere> spheres= { Sphere(Vec3f(20, 5, -40), 10, red, 600), 
-                                   Sphere(Vec3f(10, 20, -100), 40, blue, 700),
-                                   Sphere(Vec3f(-20, -20, -40), 10, green, 1000)};
-    std::vector<Light> lights = { Light(Vec3f(400, -400, 0), 0.4), Light(Vec3f(0, 0, -20), 0.7)};
+    std::vector<Sphere> spheres= { Sphere(Vec3f(-10, 20, -30), 8, red, 600), 
+                                   Sphere(Vec3f(10, 20, -40), 10, blue, 700),
+                                   Sphere(Vec3f(20, -20, -35), 9, green, 1000)};
+    std::vector<Light> lights = { Light(Vec3f(-50, 20, -35), 1), Light(Vec3f(10, 20, 0), 0.3),
+                                  Light(Vec3f(0, 200, -40), 1)};
 
 
     for (size_t j = 0; j<height; j++) {
