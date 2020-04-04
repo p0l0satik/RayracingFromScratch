@@ -6,13 +6,15 @@
 
 #include "geometry.h"
 #define EPS  0.001
+#define REQ  2
 struct Sphere {
     Vec3f center;
     float radius;
     Vec3f color;
     float blink_density;
-    float mirror = 0.15;
-    Sphere(const Vec3f &c, const float &r, const Vec3f &col, float bd) : center(c), radius(r), color(col), blink_density(bd) {}
+    float mirror ;
+    Sphere(const Vec3f &c, const float &r, const Vec3f &col, float bd, float m) 
+    : center(c), radius(r), color(col), blink_density(bd), mirror(m) {}
 
     bool ray_intersect(const Vec3f &orig, Vec3f &dir, Vec3f &cross_point, Vec3f& N) const {
         float cross_dist;
@@ -57,12 +59,13 @@ struct Light {
     float intensity;
 };
 
-Vec3f cast_ray(const Vec3f &orig,  Vec3f &dir, std::vector<Sphere>& spheres, std::vector<Light>& lights, int req = 3) {
+Vec3f cast_ray(const Vec3f &orig,  Vec3f &dir, std::vector<Sphere>& spheres, std::vector<Light>& lights, int req = REQ) {
     // float sphere_dist = std::numeric_limits<float>::max();
     if (!req) return Vec3f(0, 0, 0);
+
+    std::vector < std::pair <float, Vec3f>> col_dist;
     for (auto sphere : spheres){
         Vec3f point, N;
-        Vec3f mirror_color = Vec3f(0, 0, 0);
         if (sphere.ray_intersect(orig, dir, point, N)){
             float diff_light_intens = 0;
             float blinks = 0;
@@ -77,27 +80,45 @@ Vec3f cast_ray(const Vec3f &orig,  Vec3f &dir, std::vector<Sphere>& spheres, std
                         // if ((rev_point - point).norm() > (orig - point).norm()){
                             
                         // }
-                        // std::cout << sphere.radius << std::endl;
                         use_light = false;
                         break;
                     }
                 }
                 if (!use_light) continue;
                 diff_light_intens += light.intensity * std::max(0.f, light_dir * N);
-                Vec3f reflect_dir = N * 2.0 + light_dir * (-1) ;
+                Vec3f reflect_dir = N * 2.0 + light_dir * (-1);
                 blinks += light.intensity * std::max(0.0, pow((reflect_dir).normalize() * (dir * (-1)),
                                                      sphere.blink_density));
-                mirror_color = mirror_color + cast_ray(point, reflect_dir, spheres, lights, req - 1);
+                
             }
+            Vec3f reflect_dir = N * 2.0 - dir;
+            Vec3f mirror_color = cast_ray(point, reflect_dir.normalize(), spheres, lights, req - 1);
+            Vec3f col = sphere.color * (diff_light_intens + blinks) * (1 - sphere.mirror) + mirror_color * sphere.mirror;
 
-            return sphere.color * (diff_light_intens + blinks) + mirror_color * sphere.mirror;
+            col_dist.push_back(std::make_pair((orig - point).norm(), col));
         } 
     }
-    
+    float min_dist = 1000000000;
+    Vec3f col;
+    if (col_dist.size()){
+        for(auto dist : col_dist){
+            if (dist.first < min_dist){
+                col = dist.second;
+                min_dist = dist.first;
+            }
+
+        }
+        return col;
+    }
+    // if (req ==  REQ){
+    //     return ;
+    // }
+    // return Vec3f(0, 0, 0);
     return Vec3f(0.2, 0.7, 0.8);
 }
 
 Vec3f red(1, 0, 0), green(0, 1, 0), blue(0, 0, 1);
+Vec3f yellow(1, 1, 0);
 
 void render() {
     const int width    = 1024;
@@ -106,11 +127,12 @@ void render() {
     
     float fov = M_PI / 2;
 
-    std::vector<Sphere> spheres= { Sphere(Vec3f(-10, 20, -30), 8, red, 600), 
-                                   Sphere(Vec3f(10, 20, -40), 10, blue, 700),
-                                   Sphere(Vec3f(20, -20, -35), 9, green, 1000)};
-    std::vector<Light> lights = { Light(Vec3f(-50, 20, -35), 1), Light(Vec3f(10, 20, 0), 0.3),
-                                  Light(Vec3f(0, 200, -40), 1)};
+    std::vector<Sphere> spheres= { Sphere(Vec3f(10, 4, -30 ), 8, red, 600, 0.5), 
+                                   Sphere(Vec3f(-10, 4, -30), 8, blue, 700, 0.5),
+                                   Sphere(Vec3f(0, -10, -25), 8, green, 1000, 0.9),
+                                   Sphere(Vec3f(0, -10000000, -30), 9000, yellow, 1000, 0)};
+    std::vector<Light> lights = {Light(Vec3f(20, 10, 0), 1), Light(Vec3f(0, 0, 0), 0.0),
+     Light(Vec3f(-10, -40, -20), 0)};
 
 
     for (size_t j = 0; j<height; j++) {
