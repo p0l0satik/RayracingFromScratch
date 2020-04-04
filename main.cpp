@@ -91,7 +91,7 @@ Vec3f cast_ray(const Vec3f &orig,  Vec3f &dir, std::vector<Sphere>& spheres, std
                                                      sphere.blink_density));
                 
             }
-            Vec3f reflect_dir = N * 2.0 - dir;
+            Vec3f reflect_dir = N * 2.0  + dir ;
             Vec3f mirror_color = cast_ray(point, reflect_dir.normalize(), spheres, lights, req - 1);
             Vec3f col = sphere.color * (diff_light_intens + blinks) * (1 - sphere.mirror) + mirror_color * sphere.mirror;
 
@@ -127,9 +127,9 @@ void render() {
     
     float fov = M_PI / 2;
 
-    std::vector<Sphere> spheres= { Sphere(Vec3f(10, 4, -30 ), 8, red, 600, 0.5), 
-                                   Sphere(Vec3f(-10, 4, -30), 8, blue, 700, 0.5),
-                                   Sphere(Vec3f(0, -10, -25), 8, green, 1000, 0.9),
+    std::vector<Sphere> spheres= { Sphere(Vec3f(10, 4, -30 ), 8, red, 60, 0), 
+                                   Sphere(Vec3f(-10, 4, -30), 8, blue, 700, 0),
+                                   Sphere(Vec3f(0, -10, -25), 8, green, 1000, 0.99),
                                    Sphere(Vec3f(0, -10000000, -30), 9000, yellow, 1000, 0)};
     std::vector<Light> lights = {Light(Vec3f(20, 10, 0), 1), Light(Vec3f(0, 0, 0), 0.0),
      Light(Vec3f(-10, -40, -20), 0)};
