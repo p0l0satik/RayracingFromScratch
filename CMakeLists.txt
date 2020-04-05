@@ -1,6 +1,8 @@
 cmake_minimum_required (VERSION 2.8)
 project (RaytracingFromScratch)
 
+include_directories(include)
+
 include(CheckCXXCompilerFlag)
 
 function(enable_cxx_compiler_flag_if_supported flag)

@@ -4,148 +4,249 @@
 #include <fstream>
 #include <vector>
 
-#include "geometry.h"
-#define EPS  0.001
-#define REQ  4
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
+// #include "geometry.h"
+#define EPS    0.001
+#define C_EPS  0.00001
+#define REQ    4
+#define INF    1000000000
+
+struct Primitive {
+    virtual bool ray_intersect(glm::vec3 &orig, glm::vec3 &dir, glm::vec3 &cross_point) = 0;
+    virtual glm::vec3 get_normal(glm::vec3& point) = 0;
+
+};
+
 struct Sphere {
-    Vec3f center;
+    glm::vec3 center;
     float radius;
-    Vec3f color;
+    glm::vec3 color;
     float blink_density;
     float mirror ;
-    Sphere(const Vec3f &c, const float &r, const Vec3f &col, float bd, float m) 
+    Sphere(const glm::vec3 &c, const float &r, const glm::vec3 &col, float bd, float m) 
     : center(c), radius(r), color(col), blink_density(bd), mirror(m) {}
 
     Sphere(){
-        center = Vec3f(0, 0, 0);
+        center = glm::vec3(0, 0, 0);
         radius = 0;
         blink_density = 0;
         mirror = 0;
-        color = Vec3f(0, 0, 0);
+        color = glm::vec3(0, 0, 0);
     };
 
-    bool ray_intersect(const Vec3f &orig, Vec3f &dir, Vec3f &cross_point, Vec3f& N) const {
+    bool ray_intersect(glm::vec3 &orig, glm::vec3 &dir, glm::vec3 &cross_point) {
         float cross_dist;
-        Vec3f orig_center = center - orig;
-        if (orig_center * dir <= 0) return false;
+        glm::vec3 orig_center = center - orig;
+        if (glm::dot(orig_center, dir) <= 0) return false;
 
-        Vec3f center_ray_proj = orig + dir * ((orig_center * dir) / (dir.norm()));
+        glm::vec3 center_ray_proj = orig + dir * (glm::dot(orig_center, dir) / glm::length(dir));
 
-        float center_dist = (center_ray_proj - center).norm();
+        float center_dist = glm::distance(center_ray_proj, center);
         if (center_dist > radius) return false;
         if (center_dist < radius){
             float incide_part = sqrt(radius * radius - center_dist * center_dist);
-            cross_dist = (center_ray_proj - orig).norm() - incide_part;
+            cross_dist = glm::distance(center_ray_proj, orig) - incide_part;
             cross_point = orig + dir * cross_dist;
         } else {
             cross_point = center_ray_proj;
 
         }
-        
-        N = (cross_point - center).normalize();
         return true;
-        
     }
 
-    bool ray_intersect2(const Vec3f &orig, const Vec3f &dir, float &t0) const {
-        Vec3f L = center - orig;
-        float tca = L*dir;
-        float d2 = L*L - tca*tca;
-        if (d2 > radius*radius) return false;
-        float thc = sqrtf(radius*radius - d2);
-        t0       = tca - thc;
-        float t1 = tca + thc;
-        if (t0 < 0) t0 = t1;
-        if (t0 < 0) return false;
-        return true;
+    glm::vec3 get_normal(glm::vec3& point){
+        return glm::normalize(point - center);
     }
+};
+
+struct Triangle {
+    glm::vec3 v0, v1, v2;
+    glm::vec3 color;
+    glm::vec3 N;
+    Triangle(glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::vec3 c) : v0(p0), v1(p1), v2(p2), color(c){
+        N = glm::normalize(glm::cross(p1 - p0, p2 - p0));
+    }
+    Triangle() {}
+
+    bool ray_intersect(glm::vec3 &orig, glm::vec3 &dir, glm::vec3 &cross_point) {
+        glm::vec3 E1 = v1 - v0;
+        glm::vec3 E2 = v2 - v0;
+        glm::vec3 T  = orig - v0;
+        glm::vec3 P  = glm::cross(dir, E2);
+        glm::vec3 Q  = glm::cross(T, E1);
+        float betha  = glm::dot(P, E1);
+        
+        if (abs(betha) < C_EPS) return false;
+
+        float alpha = 1 / betha;
+
+        float u = alpha * glm::dot(P, T);
+        if (u < 0.0 || u > 1.0) return false;
+
+
+        float v = alpha * glm::dot(Q, dir);
+        if (v < 0.0 || u + v > 1.0) return false;
+
+        float t = alpha * glm::dot(Q, E2);
+
+        if (t > C_EPS){
+            cross_point = orig + dir * t;
+            return true;
+        }
+        return false;
+    }
+
+    glm::vec3 get_normal(glm::vec3& point){
+        return N;
+    }
+};
+
+struct Rect {
+    glm::vec3 v0, v1, v2, v3; //vertexes clocwise
+    Triangle t1, t2;
+    glm::vec3 N;
+    glm::vec3 color;
+    Rect() {}
+    Rect(glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, glm::vec3 c) {
+        t1 = Triangle(p0, p1, p2, c);
+        t2 = Triangle(p0, p3, p2, c);
+        N = glm::normalize(glm::cross(p1 - p0, p2 - p0));
+        color = c;
+    }
+
+    glm::vec3 get_normal(glm::vec3& point){
+        return N;
+    }
+
 };
 
 struct Light {
-    Light(const Vec3f &p, const float &i) : position(p), intensity(i) {}
-    Vec3f position;
+    Light(const glm::vec3 &p, const float &i) : position(p), intensity(i) {}
+    glm::vec3 position;
     float intensity;
 };
 
+struct Objects {
+    std::vector<Sphere> spheres; 
+    std::vector<Triangle> triangles;
+    std::vector<Rect> rects;
+};
 
-Vec3f cast_ray(const Vec3f &orig,  Vec3f &dir, std::vector<Sphere>& spheres, std::vector<Light>& lights, int req = REQ) {
+
+glm::vec3 cast_ray(glm::vec3 &orig,  
+                   glm::vec3 &dir, 
+                   Objects& objects,
+                   std::vector<Light>& lights, 
+                   int req = REQ) {
     // float sphere_dist = std::numeric_limits<float>::max();
-    if (!req) return Vec3f(0, 0, 0);
+    if (!req) return glm::vec3(0, 0, 0);
 
     Sphere nearest_one;
-    float min_dist = 1000000000;
-    bool intersect = false;
-    for (auto sphere : spheres){
-        Vec3f point, N;
-        if (sphere.ray_intersect(orig, dir, point, N)){
-            intersect = true;
-            if ((orig - point).norm() < min_dist) {
-                min_dist = (orig - point).norm();
+    Triangle n_tr;
+    float min_dist = INF;
+    int intersect = 0;
+    for (auto sphere : objects.spheres){
+        glm::vec3 point;
+        if (sphere.ray_intersect(orig, dir, point)){
+            intersect = 1;
+            if (glm::distance(orig, point) < min_dist) {
+                min_dist = glm::distance(orig, point);
                 nearest_one = sphere;
             }
         } 
     }
-    if (intersect){
+    for (auto triangle : objects.triangles) {
+        glm::vec3 point;
+        if (triangle.ray_intersect(orig, dir, point)){
+            if (glm::distance(orig, point) < min_dist) {
+                min_dist = glm::distance(orig, point);
+                n_tr = triangle;
+                intersect = 2;
+            }
+        }
+    }
+    if (intersect == 1){
 
-        Vec3f point, N;
-        nearest_one.ray_intersect(orig, dir, point, N);
-
+        glm::vec3 point;
+        nearest_one.ray_intersect(orig, dir, point);
+        glm::vec3 N = nearest_one.get_normal(point);
         float diff_light_intens = 0;
         float blinks = 0;
         for(auto light : lights){
-            Vec3f light_dir = (light.position - point).normalize();
+            glm::vec3 light_dir = glm::normalize(light.position - point);
             bool use_light = true;
-            for (auto cross_sp : spheres) {
-                Vec3f rev_point, n;
-                Vec3f moved_point = point * (1 + EPS ) ;
-                Vec3f rev_light_dir = light_dir ;
-                if (cross_sp.ray_intersect(moved_point, rev_light_dir, rev_point, n)) {
-                    // if ((rev_point - point).norm() > (orig - point).norm()){
-                    // }
-                    use_light = false;
-                    break;
+            for (auto cross_sp : objects.spheres) {
+                glm::vec3 rev_point;
+                glm::vec3 moved_point = point * float(1 + EPS) ;
+                glm::vec3 rev_light_dir = light_dir ;
+                if (cross_sp.ray_intersect(moved_point, rev_light_dir, rev_point)) {
+                    if (glm::distance(rev_point, point) < glm::distance(light.position, point)){
+                        use_light = false;
+                        break;
+                    }
                 }
             }
             if (!use_light) continue;
-            diff_light_intens += light.intensity * std::max(0.f, light_dir * N);
-            Vec3f reflect_dir = N * 2.0 + light_dir * (-1);
-            blinks += light.intensity * std::max(0.0, pow((reflect_dir).normalize() * (dir * (-1)),
+            diff_light_intens += light.intensity * std::max(0.f, glm::dot(light_dir, N));
+            glm::vec3 reflect_dir = glm::reflect(light_dir * float(-1), N);
+            blinks += light.intensity * std::max(0.0, pow(glm::dot(glm::normalize(reflect_dir), (dir * float(-1))),
                                                     nearest_one.blink_density));
             
         }
-        Vec3f reflect_dir = N * 2.0  + dir ;
-        Vec3f mirror_color = cast_ray(point, reflect_dir.normalize(), spheres, lights, req - 1);
+        glm::vec3 reflect_dir = glm::normalize(N * float(2.0) + dir);
+        glm::vec3 mirror_color = cast_ray(point, reflect_dir, objects, lights, req - 1);
         return nearest_one.color * (diff_light_intens + blinks) * (1 - nearest_one.mirror) + 
         mirror_color * nearest_one.mirror;
     }
-
-    return Vec3f(0.2, 0.7, 0.8);
+    if (intersect == 2){
+        return n_tr.color;      
+    }
+    return glm::vec3(0.2, 0.7, 0.8);
 }
 
-Vec3f red(1, 0, 0), green(1, 1, 1), blue(0, 0, 1);
-Vec3f yellow(1, 1, 0);
+template<typename T>
+void get_color(T& obj){
+    std::cout << obj.color.x << std::endl;
+}
+
+
+
+glm::vec3 red(1, 0, 0), green(1, 1, 1), blue(0, 0, 1);
+glm::vec3 yellow(1, 1, 0);
 
 void render() {
     const int width    = 1024;
     const int height   = 768;
-    std::vector<Vec3f> framebuffer(width*height);
+    std::vector<glm::vec3> framebuffer(width*height);
     
     float fov = M_PI / 2;
+    Objects objects;
+    objects.spheres= { Sphere(glm::vec3(0, 4, -45 ), 9, red, 60, 0), 
+                                   Sphere(glm::vec3(-20, 4, -50), 9, blue, 700, 0),
+                                   Sphere(glm::vec3(-10, -10, -30), 9, green, 1000, 0.9),
+                                   Sphere(glm::vec3(20, 20, -35), 12, green, 1000, 0.8)};
+    std::vector<Light> lights = {Light(glm::vec3(40, 20, 0), 0.7), Light(glm::vec3(0, 0, 0), 0.0),
+     Light(glm::vec3(-10, -40, -20), 0)};
+    objects.triangles = {Triangle(glm::vec3(-40, 0, -40), 
+                                                glm::vec3(-30, 0, -40),
+                                                glm::vec3(-30, -10, -40), red),
+                                    Triangle(glm::vec3(-40, 0, -40), 
+                                             glm::vec3(-40, -10, -40),
+                                             glm::vec3(-30, -10, -40), red)};
 
-    std::vector<Sphere> spheres= { Sphere(Vec3f(0, 4, -45 ), 9, red, 60, 0), 
-                                   Sphere(Vec3f(-20, 4, -50), 9, blue, 700, 0),
-                                   Sphere(Vec3f(-10, -10, -30), 9, green, 1000, 0.9),
-                                   Sphere(Vec3f(20, 20, -35), 12, green, 1000, 0.8)};
-    std::vector<Light> lights = {Light(Vec3f(20, 10, 0), 0.7), Light(Vec3f(0, 0, 0), 0.0),
-     Light(Vec3f(-10, -40, -20), 0)};
-
+    // get_color(triangles[0]);
+    // get_color(spheres[0]);
 
     for (size_t j = 0; j<height; j++) {
         for (size_t i = 0; i<width; i++) {
             float x =  (2*(i + 0.5)/(float)width  - 1)*tan(fov/2.)* width/(float)height;
             float y = -(2*(j + 0.5)/(float)height - 1)*tan(fov/2.);
-            Vec3f dir = Vec3f(x, y, -1).normalize();
-            framebuffer[i+j*width] = cast_ray(Vec3f(0, 0, 0), dir.normalize(), spheres, lights);
+            glm::vec3 dir = glm::normalize(glm::vec3(x, y, -1));
+            glm::vec3 orig = glm::vec3(0, 0, 0);
+            framebuffer[i+j*width] = cast_ray(orig, dir, objects, lights);
         }
     }
 
