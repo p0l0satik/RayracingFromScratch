@@ -1,0 +1,3 @@
+/home/p0l0satik/RayracingFromScratch/build/CMakeFiles/rebuild_cache.dir
+/home/p0l0satik/RayracingFromScratch/build/CMakeFiles/RaytracingFromScratch.dir
+/home/p0l0satik/RayracingFromScratch/build/CMakeFiles/edit_cache.dir

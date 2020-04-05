@@ -307,12 +307,12 @@ void render() {
     std::vector<Light> lights = {Light(Vec(0, 10, 0), 0.9), Light(Vec(35, -17, -30), 0.6),
      Light(Vec(-10, -40, -20), 0.7), };
 
-    objects.triangles = {Triangle(Vec(-40, 30, -40), 
-                                  Vec(-30, 30, -40),
-                                  Vec(-30, 20, -40), resin_red),
+    objects.triangles = {Triangle(Vec(-40, 10, -40), 
+                                  Vec(-30, 10, -40),
+                                  Vec(-30, 0, -40), resin_red),
 
-                         Triangle(Vec(-40, 30, -40), 
-                                  Vec(-40, 20, -45),
+                         Triangle(Vec(-40, 10, -40), 
+                                  Vec(-40, 0, -45),
                                   Vec(-30, 20, -40), resin_red),
 
                          Triangle(Vec(-40, 30, -40), 
