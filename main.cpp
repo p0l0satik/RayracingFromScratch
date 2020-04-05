@@ -226,7 +226,8 @@ Vec get_color(Vec &orig, Vec &dir, T& obj, Objects& objects, std::vector<Light>&
         Vec light_dir = glm::normalize(light.position - point);
         if (get_shadow(objects.spheres, point, light, orig)) continue;
         if (get_shadow(objects.triangles, point, light, orig)) continue;
-        // if (get_shadow(objects., point, light, orig)) continue;
+        if (get_shadow(objects.rects, point, light, orig)) continue;
+        if (get_shadow(objects.piramids, point, light, orig)) continue;
 
         diff_light_intens += light.intensity * std::max(0.f, glm::dot(light_dir, N));
         Vec reflect_dir = glm::reflect(light_dir * float(-1), N);
@@ -305,12 +306,13 @@ void render() {
     float fov = M_PI / 2;
     Objects objects;
     objects.spheres= { Sphere(Vec(0, 4, -45 ), 9.0, resin_red), 
-                                   Sphere(Vec(-60, -5, -50), 9.0, metal_blue),
-                                   Sphere(Vec(-10, -10, -30), 9.0, glass_gr),
-                                   Sphere(Vec(20, 20, -35), 12, glass_gr)};
+                       Sphere(Vec(-60, -5, -50), 9.0, metal_blue),
+                       Sphere(Vec(-10, -10, -30), 9.0, glass_gr),
+                       Sphere(Vec(20, 20, -35), 12, glass_gr)};
 
-    std::vector<Light> lights = {Light(Vec(1, 1, 0), 1), Light(Vec(35, -17, -30), 0.6),
-     Light(Vec(-10, -40, -20), 0.7), };
+    std::vector<Light> lights = {Light(Vec(11, 40, 0), 1), 
+                                 Light(Vec(35, -17, -30), 0),
+                                 Light(Vec(-10, -40, -20), 1), };
 
     objects.triangles = {Triangle(Vec(-40, 0, -40), 
                                   Vec(-30, 0, -40),
