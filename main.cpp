@@ -12,7 +12,7 @@
 #define EPS    0.0001
 #define C_EPS  0.00001
 #define REQ    4
-#define INF    100
+#define INF    10000
 using Vec = glm::vec3;
 
 struct Primitive {
@@ -25,7 +25,9 @@ struct Material{
     Vec color;
     float blink_density;
     float mirror;
-    Material(Vec c, float bl, float mirr) : color(c), blink_density(bl), mirror(mirr){}
+    float blink_value;
+    Material(Vec c, float bl, float mirr, float bl_vl) 
+    : color(c), blink_density(bl), mirror(mirr), blink_value(bl_vl){}
     Material(){}
 };
 
@@ -229,12 +231,14 @@ Vec get_color(Vec &orig, Vec &dir, T& obj, Objects& objects, std::vector<Light>&
         diff_light_intens += light.intensity * std::max(0.f, glm::dot(light_dir, N));
         Vec reflect_dir = glm::reflect(light_dir * float(-1), N);
         float cos_val = glm::dot(glm::normalize(reflect_dir), (dir * float(-1)));
-        blinks += light.intensity * std::max(0.0, pow(cos_val, obj.props.blink_density));
+        blinks += light.intensity * pow(std::max(0.0F, cos_val), obj.props.blink_density);
         
     }
     Vec reflect_dir = glm::normalize(N * float(2.0) + dir);
     Vec mirror_color = cast_ray(point, reflect_dir, objects, lights, req - 1);
-    return obj.props.color * (diff_light_intens + blinks) * (1 - obj.props.mirror) + mirror_color * obj.props.mirror;
+    return obj.props.color * (diff_light_intens) * (1 - obj.props.mirror) + 
+        Vec(1, 1, 1) * blinks * obj.props.blink_value + 
+        mirror_color * obj.props.mirror;
 }
 
 template <typename T> 
@@ -289,8 +293,9 @@ Vec cast_ray(Vec &orig,
 Vec red(1, 0, 0), green(1, 1, 1), blue(0, 0, 1);
 Vec yellow(1, 1, 0), white(1, 1, 1), purple(1, 0, 1);
 
-Material glass_gr(green, 1000, 0.9), resin_red(red, 30, 0), metal_blue(blue, 700, 0.75), metal_yellow(yellow, 700, 0.75);
-Material purple_wood_polished(purple, 1000, 0.8);
+Material glass_gr(green, 1000, 0.9, 5), resin_red(red, 400, 0, 1.5), metal_blue(blue, 700, 0.75, 0.3), 
+metal_yellow(yellow, 700, 0.75, 0.3);
+Material purple_wood_polished(purple, 1000, 0.8, 5);
 
 void render() {
     const int width    = 1024;
@@ -304,24 +309,24 @@ void render() {
                                    Sphere(Vec(-10, -10, -30), 9.0, glass_gr),
                                    Sphere(Vec(20, 20, -35), 12, glass_gr)};
 
-    std::vector<Light> lights = {Light(Vec(0, 10, 0), 0.9), Light(Vec(35, -17, -30), 0.6),
+    std::vector<Light> lights = {Light(Vec(1, 1, 0), 1), Light(Vec(35, -17, -30), 0.6),
      Light(Vec(-10, -40, -20), 0.7), };
 
-    objects.triangles = {Triangle(Vec(-40, 10, -40), 
-                                  Vec(-30, 10, -40),
-                                  Vec(-30, 0, -40), resin_red),
+    objects.triangles = {Triangle(Vec(-40, 0, -40), 
+                                  Vec(-30, 0, -40),
+                                  Vec(-30, -10, -40), resin_red),
 
-                         Triangle(Vec(-40, 10, -40), 
-                                  Vec(-40, 0, -45),
-                                  Vec(-30, 20, -40), resin_red),
+                         Triangle(Vec(-40, 0, -40), 
+                                  Vec(-40, -10, -45),
+                                  Vec(-30, -10, -40), resin_red),
 
-                         Triangle(Vec(-40, 30, -40), 
-                                  Vec(-30, 30, -40),
-                                  Vec(-40, 20, -45), resin_red),
+                         Triangle(Vec(-40, 0, -40), 
+                                  Vec(-30, 0, -40),
+                                  Vec(-40, -10, -45), resin_red),
 
-                         Triangle(Vec(-30, 20, -40), 
-                                  Vec(-30, 30, -40),
-                                  Vec(-40, 20, -45), resin_red)};
+                         Triangle(Vec(-30, -10, -40), 
+                                  Vec(-30, 0, -40),
+                                  Vec(-40, -10, -45), resin_red)};
     
     objects.rects = {Rect(Vec(-INF, -20, INF), Vec(INF, -20, INF), Vec(INF, -20, -INF), Vec(-INF, -20, -INF), metal_yellow)};
 
